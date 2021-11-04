@@ -10,6 +10,7 @@ import dask
 from dask.dataframe import to_parquet
 import csv
 from dask.dataframe import from_pandas
+import gc 
 gc.collect()
 """
 Create local CSV file “mydata.csv” with 1000000 
@@ -192,6 +193,65 @@ def print_db_file_info_base_one_column_and_lower_than_value(key, value):
         print(row)
     con.close()
     return 
+def first_chunk():
+    f2 = open(csv_file_name, "rb")
+    f2.seek(0, 0)
+    d2 = f2.read(middle).decode(encoding='utf-8')
+    amount_of_rows = d2.count('\n')
+    
+    was_endline = False
+    if d2[-1] != '\n':
+        amount_of_rows +=1
+        was_endline = True
+        
+    print('first_cunk amount of rows is = ' + str(amount_of_rows))
+    return amount_of_rows, was_endline
+
+def last_chunk():
+    f2 = open(csv_file_name, "rb")
+    f2.seek(middle+1, 0)
+    d2 = f2.read(middle).decode(encoding='utf-8')
+    amount_of_rows = d2.count('\n')
+
+    print('last_cunk amount of rows is = ' + str(amount_of_rows))
+    return amount_of_rows
+
+def get_number_of_lines_in_file():
+    amount_of_rows_first, was_endline = first_chunk()
+    amount_of_rows_last = last_chunk()
+    total_rows = amount_of_rows_first + amount_of_rows_last
+    if was_endline is True:
+        total_rows -= 1
+        
+    print('total_rows amount of rows is = ' + str(total_rows))
+    return total_rows
+
+def current_chunk(location, chunk_size):
+    f2 = open(csv_file_name, "rb")
+    f2.seek(location, 0)
+    d2 = f2.read(chunk_size).decode(encoding='utf-8')
+    amount_of_rows = d2.count('\n')
+    
+    was_endline = False
+    if d2[-1] != '\n':
+        amount_of_rows +=1
+        was_endline = True
+        
+    #print('first_cunk amount of rows is = ' + str(amount_of_rows))
+    return amount_of_rows, was_endline
+
+def get_number_of_lines_in_file_v2(file_size):
+    total_rows = 0
+    chunk_size = 11
+    for location in range(0,file_size,chunk_size):    
+        amount_of_rows, was_endline = current_chunk(location, chunk_size)
+        total_rows += amount_of_rows
+        if was_endline is True:
+            total_rows -= 1
+        
+    print('total_rows amount of rows is = ' + str(total_rows))
+    return total_rows
+    
 
 # init_data_set_configuration settings
 init_data_set_configuration()
@@ -208,7 +268,7 @@ fill_db_data_base_using_csv_data_base_with_same_keys(mydata_df)
 # print db base single key
 print_db_file_info_bsase_single_key('id')
 
-# 3 option 2 query our data base
+# 3 option 2 query our data base predicate and projection
 print_db_file_info_base_one_column_and_equal_value('color', 'Blue')
 print_db_file_info_base_one_column_and_geater_than_value('id',2)
 print_db_file_info_base_one_column_and_lower_than_value('id',2)
@@ -226,6 +286,28 @@ with open(csv_file_name) as csv_file:
             csv_rows.append(current_row)
         line_count+=1
 
+
+"""
+def read_csv_file_and_get_size(max_size=inf):
+    with open(csv_file_name) as csv_file:
+        csv_reader = csv.reader(csv_file, delimiter=',')
+        line_count = 0
+        file_size = 0
+        csv_rows = []
+        for row in csv_reader:
+            if line_count == 0:
+                columns_list = row[1::]
+            else:
+                current_row = row[1::]
+                csv_rows.append(current_row)
+            line_size = get_size(row)
+            file_size += line_size
+            
+            line_count+=1
+            if file_size>max_size:
+                break
+    return csv_rows, file_size
+"""
 # create new data frame base csv file 
 mydata_df_with_out_pandas = pd.DataFrame(csv_rows, columns = columns_list )
 print('The amount of row in the following csv is ' + str(line_count))
@@ -238,7 +320,18 @@ dask_df = from_pandas(mydata_df, npartitions=4)
 dask_df.to_parquet(parquet_file_name_using_dask)
 mydata_df_with_out_pandas.to_parquet(parquet_file_name_using_pandas)
 
+memory_usage_size = mydata_df_with_out_pandas.memory_usage(deep = False).sum()
+memory_usage_size = os.path.getsize(csv_file_name)
+middle = memory_usage_size//2
 
+
+
+first_chunk()
+last_chunk()
+get_number_of_lines_in_file()
+
+get_number_of_lines_in_file_v2(memory_usage_size)
+ 
 """
 Question: Examine generated Parquet files. Why do you think Dask generated Parquet file
 differently than PyArrow and Pandas? What might be explanaJon for this?
@@ -256,17 +349,33 @@ Answer:
 """
 Question:
     Explain which parts of the statement are predicate and which parts are projecJon
-Answer:
-    1) Predicate Operation : This operation is used to select rows from a
-    table (relation) that specifies a given logic, which is called as
-    a predicate. The predicate is a user defined condition to select
-    rows of user's choice.
-    2) Project Operation : If the user is interested in selecting the values
-    of a few attributes, rather than selection all attributes of the Table
-    (Relation), then one should go for PROJECT Operation.  
 
+Answer:
+    1) Predicate Operation : 
+       a)   This operation is used to select rows from a
+            table (relation) that specifies a given logic, which is called as
+            a predicate. 
+       b)  The predicate is a user defined condition to select
+           rows of user's choice.
+    2) Project Operation : 
+        a)  If the user is interested in selecting the values
+            of a few attributes, rather than selection all attributes of the Table
+            then one should go for PROJECT Operation.  
 """
 
+
+"""
+Question:
+    Explain why total number of lines from the first chunk and second chunk is larger than
+    the number of lines calculated in the step (1) of Task 2
+
+Answer:
+    there are 2 factors that change the number of rows calculated in task2:
+        1. in task 2 we did not count the header
+        2. in this task, the file chunk might end in the mddle of a row, and so 
+        that row could be counted twice.
+        
+"""
 
 
 
