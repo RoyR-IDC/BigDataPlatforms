@@ -90,7 +90,7 @@ def init_data_set_configuration():
     global parquet_file_name_using_dask,parquet_file_name_using_pyarray 
     global parquet_file_name_using_pandas, csv_index, csv_ending, amount_of_files
     global map_reduce_folder_names, amount_of_process, map_regex, db_columns
-    global db_columns_type, db_table_name
+    global db_columns_type, db_table_name, reduce_regex_init, reduce_regex_final
     
     
     Current_python_file_path = os.getcwd()
@@ -107,6 +107,9 @@ def init_data_set_configuration():
     csv_file_name = 'myCSV'
     csv_ending = '.csv'
     map_regex = 'part-tmp-'
+    reduce_regex_init = 'part-'
+    reduce_regex_final = '-final'
+
     db_table_name = 'temp_results'
 
     #parquet_file_name_using_dask = 'mydatapyarrow_dask.parquet'
@@ -208,10 +211,18 @@ def map_function(filename: str) -> dict:
     Dict = {'key': df['firstname'].to_list(), 'value': [filename]*len(df)}
     return Dict
 
-def run_at_parallel(i_item_index, i_item, function):
+
+def reduce_function(key: str, value: str) -> dict:
+    #print(filename)
+    amount_of_csv_files = value.split(',').__len__()
+    Dict = {'key': key, 'value': amount_of_csv_files}
+    return Dict
+
+def run_at_parallel_map(i_item_index, i_item, function):
     new_path = None
     succeed = True
     try:
+        
         new_path  = map_reduce_folder_names[0] + '\\'+ map_regex + str(i_item_index) + csv_ending
     
         dict_result = function(i_item)
@@ -222,17 +233,40 @@ def run_at_parallel(i_item_index, i_item, function):
         succeed = os.path.exists(new_path)
     except:
         succeed = False
-   
-    
+        
     return  succeed, new_path
+
+
+def run_at_parallel_reduce(i_item_index, i_item, function):
+    new_path = None
+    succeed = True
+    try:
+        new_path  = map_reduce_folder_names[1] + '\\'+ reduce_regex_init + str(i_item_index) + reduce_regex_final + csv_ending
+        print(new_path)
+        key = i_item[0]
+        value = i_item[1]
+
+        dict_result = function(key, value)
+        result_df = pd.DataFrame.from_records([dict_result])
+
+        result_df.to_csv(new_path) 
+        
+        succeed = os.path.exists(new_path)
+    except:
+        succeed = False
+        
+    return  succeed, new_path
+
 
 def print_db_file_info_bsase_single_key(key):
     con = sqlite3.connect(db_file_name)
     cur = con.cursor()
+    return_list = []
     for row in cur.execute('SELECT key, GROUP_CONCAT(value) FROM ' +db_table_name+ ' GROUP BY ' + key + ' ORDER BY ' + key):
         print(row)
+        return_list.append(row)
     con.close()
-    return
+    return return_list
 
 def print_db_file_info_bsase_single_key_hafoocha(key):
     con = sqlite3.connect(db_file_name)
@@ -250,7 +284,7 @@ def print_db_file_info():
     con.close()
     return
 
-succeed_new_path_list  = Parallel(n_jobs=amount_of_process, backend="threading", prefer="processes")(delayed(run_at_parallel)(
+succeed_new_path_list  = Parallel(n_jobs=amount_of_process, backend="threading", prefer="processes")(delayed(run_at_parallel_map)(
             index, item, map_function) for index, item in enumerate(input_data))
 
 boolean_results = [boolean for boolean, path in succeed_new_path_list]
@@ -269,9 +303,19 @@ if False in boolean_results:
     
 print_db_file_info()
 
-print_db_file_info_bsase_single_key(key='key')
+List = print_db_file_info_bsase_single_key(key='key')
 
-print_db_file_info_bsase_single_key_hafoocha(key='value')
+
+# Begin by Performing REDUCE actions
+# we will open a thread for each REDUCE
+reduce_return_dict_succeed  = Parallel(n_jobs=amount_of_process, backend="threading", prefer="processes")(delayed(run_at_parallel_reduce)(
+    index, item, reduce_function) for index, item in enumerate(List))
+
+boolean_results = [boolean for boolean, path in reduce_return_dict_succeed]
+reduce_dict = [reduce_dict for boolean, reduce_dict in reduce_return_dict_succeed]
+        
+reduce_df = pd.DataFrame(data= reduce_dict)
+#print_db_file_info_bsase_single_key_hafoocha(key='value')
 
 print("hoi)")
 """
@@ -356,20 +400,6 @@ pass
 
 # implement all of the class here
 
-def map_function(key):
-    return key+1
-
-def reduce_function(key):
-    return key+2
-
-def use_them(**kwargs):
-    name = kwargs['name']
-    map_function = kwargs['map_function']
-    result = map_function(5)
-    
-item = 5
-result = map_function(5)
-
 
 class MapReduceEngine():
     def execute(input_data: list, map_function, reduce_function):
@@ -388,6 +418,21 @@ class MapReduceEngine():
             print('Map Reduce Failed')
             return
         
+        List = print_db_file_info_bsase_single_key(key='key')
+        
+        # Begin by Performing REDUCE actions
+        # we will open a thread for each REDUCE
+        succeed_new_path_list  = Parallel(n_jobs=amount_of_process, backend="threading", prefer="processes")(delayed(run_at_parallel)(
+            index, item, reduce_function) for index, item in enumerate(List))
+
+        boolean_results = [boolean for boolean, path in succeed_new_path_list]
+        filepaths = [path for boolean, path in succeed_new_path_list]
+        
+        #
+        
+        if False in boolean_results:
+            print('Map Reduce Failed')
+            return
         
     
     
