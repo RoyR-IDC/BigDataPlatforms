@@ -8,7 +8,23 @@
 
 `Total: 100`
 """
+import sqlite3
+import pandas as pd
+import numpy as np 
+import random
+import os 
+import gc
+import pyarrow.parquet as pq
+import pyarrow as pa
+import dask
+from dask.dataframe import to_parquet
+import csv
+from dask.dataframe import from_pandas
+import gc 
+import glob
+from shutil import copyfile
 
+gc.collect()
 
 # general
 import os
@@ -16,6 +32,7 @@ import time
 import random
 import warnings
 import threading # you can use easier threading packages
+import string 
 
 # ml
 import numpy as np
@@ -28,14 +45,10 @@ import matplotlib.pyplot as plt
 
 # notebook
 from IPython.display import display
-
-
+from pathlib import Path
 warnings.filterwarnings('ignore')
-
-%%javascript
-IPython.OutputArea.prototype._should_scroll = function(lines) {
-    return false;
-}
+from joblib import Parallel, delayed
+from functools import partial
 
 
 """
@@ -54,13 +67,213 @@ Values should be randomly chosen from the lists:
 
 """
 
-firstname = ['John', 'Dana', 'Scott', 'Marc', 'Steven', 'Michael', 'Albert', 'Johanna']
-city = ['NewYork', 'Haifa', 'Munchen', 'London', 'PaloAlto',  'TelAviv', 'Kiel', 'Hamburg']
-secondname = None # please use some version of random
-
-pass
 
 
+class single_record():
+    firstname = ''
+    secoundname = ''
+    city = ''
+    
+    # Set the value options
+    firstname_option_list  = ['John', 'Dana', 'Scott', 'Marc', 'Steven', 'Michael', 'Albert', 'Johanna']
+    secoundname_option_list  = ['John', 'Dana', 'Scott', 'Marc', 'Steven', 'Michael', 'Albert', 'Johanna']
+    city_option_list = ['NewYork', 'Haifa', 'Munchen', 'London', 'PaloAlto',  'TelAviv', 'Kiel', 'Hamburg']
+    def __init__(self, id):
+        self.firstname = random.choice(self.firstname_option_list)	
+        random_name  = ''.join(random.choice(string.ascii_uppercase + string.ascii_lowercase) for _ in range(random.randint(2,4)))
+        self.secoundname = random_name
+        self.city = random.choice(self.city_option_list)
+        
+def init_data_set_configuration():
+    # Set the value options
+    global max_rows, csv_columns, db_file_name, csv_file_name, columns_type
+    global parquet_file_name_using_dask,parquet_file_name_using_pyarray 
+    global parquet_file_name_using_pandas, csv_index, csv_ending, amount_of_files
+    global map_reduce_folder_names, amount_of_process, map_regex, db_columns
+    global db_columns_type, db_table_name
+    
+    
+    Current_python_file_path = os.getcwd()
+    max_rows = 10
+    amount_of_files = 5 # neeed to be 20
+    amount_of_process = 2
+    csv_columns = ['firstname','secondname','city']
+    db_columns = ['key', 'value']
+    map_reduce_folder_names =  [Current_python_file_path+ '\\mapreducetemp', Current_python_file_path+'\\mapreducefinal']
+
+    db_columns_type = [ 'text',  'text']
+
+    db_file_name = 'mydata.db'
+    csv_file_name = 'myCSV'
+    csv_ending = '.csv'
+    map_regex = 'part-tmp-'
+    db_table_name = 'temp_results'
+
+    #parquet_file_name_using_dask = 'mydatapyarrow_dask.parquet'
+    #parquet_file_name_using_pyarray = 'mydatapyarrow_pyarray.parquet'
+    #parquet_file_name_using_pandas = 'mydatapyarrow_pandas.parquet'
+
+    return
+
+def create_csvdatabase_file(max_rows):
+    # this loop generate single fruit
+    create_n_list_in_advance = max_rows*[None]
+    for i_row_index in range(max_rows):
+        i_record = single_record(i_row_index)
+        create_n_list_in_advance[i_row_index] = [i_record.firstname, i_record.secoundname, 
+                                                 i_record.city]
+    
+    mydata_df = pd.DataFrame(create_n_list_in_advance, columns = csv_columns )
+    mydata_df.to_csv(csv_file_name)
+    return mydata_df
+
+def generate_n_csv_file():
+    for i_csv_index in range(0, amount_of_files):
+        mydata_df = create_csvdatabase_file(max_rows)
+        mydata_df.to_csv(csv_file_name + str(i_csv_index) + csv_ending )
+    return
+
+def create_new_folder(path):
+    Path(path).mkdir(parents=True, exist_ok=True)
+    return 
+
+def generate_map_reduce_folders():
+    for i_folder in map_reduce_folder_names:
+        create_new_folder(i_folder)
+    return 
+
+def create_db_database(db_file_name):
+    is_exist = os.path.exists(db_file_name)
+    if  is_exist:
+        os.remove(db_file_name)
+    con = sqlite3.connect(db_file_name)
+        
+    
+    cur = con.cursor()
+    
+    # Create table
+    columns_type_list = list(map(lambda x,y: x+' ' + y, db_columns, db_columns_type))
+    columns_type_list_string = "("+", ".join(map(str, columns_type_list))+")"
+
+    cur.execute(''' 
+                CREATE TABLE temp_results
+                ''' + columns_type_list_string + \
+               '''''')
+    
+    con.commit()
+    con.close()
+    return con, cur
+
+
+def fill_db_data_base_using_csv_data_base_with_same_keys(mydata_df):
+    con = sqlite3.connect(db_file_name)
+    cur = con.cursor()
+
+    for i_csv_row in range(mydata_df.shape[0]):
+        # Take row from csv file
+        i_row = mydata_df.iloc[i_csv_row]
+        i_row_as_list = i_row.to_list()
+        
+        i_row_as_list_string = "('"+"','".join(map(str, i_row_as_list))+"')"
+        #cur.execute("INSERT INTO stocks VALUES ('2006-01-05','BUY','RHAT','100')")
+
+        #Insert a csv row of data base
+        cur.execute("INSERT INTO temp_results VALUES "  \
+                    +i_row_as_list_string + \
+                    "")
+    con.commit()
+    con.close()
+    return
+
+
+
+# init_data_set_configuration settings
+init_data_set_configuration()
+
+# 
+generate_n_csv_file()
+
+
+generate_map_reduce_folders()
+# create csv file as data frame 
+
+
+input_data = glob.glob(csv_file_name+'*'+csv_ending  )
+        
+
+
+def map_function(filename: str) -> dict:
+    #print(filename)
+    df = pd.read_csv(filename)
+    Dict = {'key': df['firstname'].to_list(), 'value': [filename]*len(df)}
+    return Dict
+
+def run_at_parallel(i_item_index, i_item, function):
+    new_path = None
+    succeed = True
+    try:
+        new_path  = map_reduce_folder_names[0] + '\\'+ map_regex + str(i_item_index) + csv_ending
+    
+        dict_result = function(i_item)
+        result_df = pd.DataFrame(data=dict_result)
+
+        result_df.to_csv(new_path) 
+        
+        succeed = os.path.exists(new_path)
+    except:
+        succeed = False
+   
+    
+    return  succeed, new_path
+
+def print_db_file_info_bsase_single_key(key):
+    con = sqlite3.connect(db_file_name)
+    cur = con.cursor()
+    for row in cur.execute('SELECT key, GROUP_CONCAT(value) FROM ' +db_table_name+ ' GROUP BY ' + key + ' ORDER BY ' + key):
+        print(row)
+    con.close()
+    return
+
+def print_db_file_info_bsase_single_key_hafoocha(key):
+    con = sqlite3.connect(db_file_name)
+    cur = con.cursor()
+    for row in cur.execute('SELECT value, GROUP_CONCAT(key) FROM ' +db_table_name+ ' GROUP BY ' + key + ' ORDER BY ' + key):
+        print(row)
+    con.close()
+    return
+
+def print_db_file_info():
+    con = sqlite3.connect(db_file_name)
+    cur = con.cursor()
+    for row in cur.execute('SELECT * FROM '+db_table_name):
+        print(row)
+    con.close()
+    return
+
+succeed_new_path_list  = Parallel(n_jobs=amount_of_process, backend="threading", prefer="processes")(delayed(run_at_parallel)(
+            index, item, map_function) for index, item in enumerate(input_data))
+
+boolean_results = [boolean for boolean, path in succeed_new_path_list]
+filepaths = [path for boolean, path in succeed_new_path_list]
+
+sql_conn, cur = create_db_database(db_file_name)
+
+sql_conn = sqlite3.connect(db_file_name)
+list(map(lambda x: pd.read_csv(x, index_col=0).to_sql('temp_results',sql_conn, if_exists='append',index=False), filepaths ))    
+sql_conn.close()
+
+    
+if False in boolean_results:
+    print('Map Reduce Failed')
+    
+    
+print_db_file_info()
+
+print_db_file_info_bsase_single_key(key='key')
+
+print_db_file_info_bsase_single_key_hafoocha(key='value')
+
+print("hoi)")
 """
 Use python to Create `mapreducetemp` and `mapreducefinal` folders
 """
@@ -143,9 +356,39 @@ pass
 
 # implement all of the class here
 
+def map_function(key):
+    return key+1
+
+def reduce_function(key):
+    return key+2
+
+def use_them(**kwargs):
+    name = kwargs['name']
+    map_function = kwargs['map_function']
+    result = map_function(5)
+    
+item = 5
+result = map_function(5)
+
+
 class MapReduceEngine():
-    def execute(input_data, map_function, reduce_function):
-        pass
+    def execute(input_data: list, map_function, reduce_function):
+        
+        # Begin by Performing MAP actions
+        # we will open a thread for each MAP
+        succeed_new_path_list  = Parallel(n_jobs=amount_of_process, backend="threading", prefer="processes")(delayed(run_at_parallel)(
+            index, item, map_function) for index, item in enumerate(input_data))
+
+        boolean_results = [boolean for boolean, path in succeed_new_path_list]
+        filepaths = [path for boolean, path in succeed_new_path_list]
+        
+        #
+        
+        if False in boolean_results:
+            print('Map Reduce Failed')
+            return
+        
+        
     
     
 """
