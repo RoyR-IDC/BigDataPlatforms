@@ -103,7 +103,7 @@ def init_data_set_configuration():
 
     db_columns_type = [ 'text',  'text']
 
-    db_file_name = 'mydata.db'
+    db_file_name = Current_python_file_path+'\\mydata.db'
     csv_file_name = 'myCSV'
     csv_ending = '.csv'
     map_regex = 'part-tmp-'
@@ -226,7 +226,7 @@ def run_at_parallel_map(i_item_index, i_item, function):
         new_path  = map_reduce_folder_names[0] + '\\'+ map_regex + str(i_item_index) + csv_ending
     
         dict_result = function(i_item)
-        result_df = pd.DataFrame(data=dict_result)
+        result_df = pd.DataFrame(data=dict_result, columns = ['key', 'value'])
 
         result_df.to_csv(new_path) 
         
@@ -284,6 +284,114 @@ def print_db_file_info():
     con.close()
     return
 
+
+
+# implement all of the class here
+
+class MapReduceEngine():
+    def execute(self, input_data, map_function, reduce_function):
+        
+        
+        #  1) For each key  from the  input_data, start a new Python thread that executes 
+        #     map_function(key)
+        #  2) Each thread will store results of the map_function into 
+        #     mapreducetemp/part-tmp-X.csv where X
+        #     is a unique number per each thread.
+        #  3) Keep the list of all threads and check whether they are completed
+        
+        succeed_new_path_list  = Parallel(n_jobs=amount_of_process, backend="threading", \
+                                          prefer="processes")(delayed(run_at_parallel_map)(
+            index, item, map_function) for index, item in enumerate(input_data))
+        
+        
+        # 4) Once all threads completed, load content of all CSV files into the temp_results
+        #    table in SQLite
+        
+        # get new files names
+        filepaths = [path for boolean, path in succeed_new_path_list]
+        
+        # write generated csv files to sql data base
+        sql_conn = sqlite3.connect(db_file_name)
+        list(map(lambda x: pd.read_csv(x, index_col=0) \
+                 .to_sql('temp_results',sql_conn, if_exists='append',index=False), filepaths ))    
+        sql_conn.close()
+        
+        # get list of succeed or failed of threads
+        boolean_results = [boolean for boolean, path in succeed_new_path_list]
+        
+        # validate that all threads are completed succesfully
+        if False in boolean_results:
+            status = 'Map Reduce Failed'
+            print(status)
+            return status
+
+        #print_db_file_info()
+        
+        # 5) **Write SQL statement** that generates a sorted list by key of the form 
+        #    `(key, value)` where value is concatenation of ALL values in the value column
+        #     that match specific key. For example, if table has records
+        
+        # query data base using GROUP_CONCAT and GROUP BY  and ORDER BY 
+        generates_list = print_db_file_info_bsase_single_key(key='key')
+        
+        # 6) **Start a new thread** for each value from
+        #    the generated list in the previous step, to execute `reduce_function(key,value)
+        #    Begin by Performing REDUCE actions
+        #    we will open a thread for each REDUCE
+        # 7) Each thread will store results of reduce_function into 
+        #   `mapreducefinal/part-X-final.csv` file
+        
+        # 8) Keep list of all threads and check whether they are completed
+        
+        reduce_return_dict_succeed  = Parallel(n_jobs=amount_of_process, backend="threading", prefer="processes")(delayed(run_at_parallel_reduce)(
+            index, item, reduce_function) for index, item in enumerate(generates_list))
+
+        
+        # 9) Once all threads completed, print on the screen 
+        #   `MapReduce Completed` otherwise print `MapReduce Failed`
+        boolean_results = [boolean for boolean, path in reduce_return_dict_succeed]
+        
+        if False in boolean_results:
+            status = 'Map Reduce Failed'
+            print(status)
+            return status
+        
+        reduce_dict = [reduce_dict for boolean, reduce_dict in reduce_return_dict_succeed]
+    
+        reduce_df = pd.DataFrame(data= reduce_dict)
+        status = 'Map Reduce Completed'
+        print(status)
+
+        return status
+        
+def inverted_reduce(value, documents):
+    ducument_name_list = documents.split(',')
+    ducument_name_list_no_duplicates = list(set(ducument_name_list))
+    string_ducument_name_list_no_duplicates = (', ').join(ducument_name_list_no_duplicates)
+    return_list = [value, string_ducument_name_list_no_duplicates]
+    return return_list
+
+
+def inverted_map(document_name):
+    #ducument_name = input_data[0]
+    csv_df = pd.read_csv(document_name, index_col=0)
+    csv_size = csv_df.shape[0]
+    csv_columns = csv_df.columns.to_list()
+    output_list = []
+    for i_col in csv_columns:
+        col_vals  = csv_df[i_col].to_list()
+        curr_ouput = list(map(lambda x,y,z: (x+ '_' + y, z) , \
+                              csv_size*[i_col], col_vals, csv_size*[document_name]))
+        output_list += curr_ouput
+    
+    return output_list
+        
+mapreduce = MapReduceEngine()
+status = mapreduce.execute(input_data, inverted_map, inverted_reduce)
+print(status)
+        
+        
+        
 succeed_new_path_list  = Parallel(n_jobs=amount_of_process, backend="threading", prefer="processes")(delayed(run_at_parallel_map)(
             index, item, map_function) for index, item in enumerate(input_data))
 
@@ -316,6 +424,30 @@ reduce_dict = [reduce_dict for boolean, reduce_dict in reduce_return_dict_succee
         
 reduce_df = pd.DataFrame(data= reduce_dict)
 #print_db_file_info_bsase_single_key_hafoocha(key='value')
+
+a= 5
+
+
+input_data
+
+ducument_name = input_data[0]
+csv_df = pd.read_csv(ducument_name, index_col=0)
+csv_size = csv_df.shape[0]
+csv_columns = csv_df.columns.to_list()
+output_list = []
+for i_col in csv_columns:
+    col_vals  = csv_df[i_col].to_list()
+    curr_ouput = list(map(lambda x,y,z: (x+ '_' + y, z) , csv_size*[i_col], col_vals, csv_size*[ducument_name]))
+    output_list += curr_ouput
+    
+value = 'firstname_Albert'
+ducument =  'myCSV2.csv, myCSV5.csv,myCSV2.csv'
+    
+ducument_name_list = ducument.split(',')
+ducument_name_list_no_duplicates = list(set(ducument_name_list))
+string_ducument_name_list_no_duplicates = (', ').join(ducument_name_list_no_duplicates)
+return_list = [value, string_ducument_name_list_no_duplicates]
+
 
 print("hoi)")
 """
