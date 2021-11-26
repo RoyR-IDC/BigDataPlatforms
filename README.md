@@ -1,2 +1,2 @@
-# BigDataPlatforms Repo !
+# BigDataPlatforms Repo
 Enjoy :)
