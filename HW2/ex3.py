@@ -410,15 +410,21 @@ class BST:
         of the root
         """
         left_subtree = BST.create_BST_from_sorted_arr(arr[:mid])
-        root_node.left = left_subtree.root
-
+        try:
+            if not left_subtree is None:
+                root_node.left = left_subtree.root
+        except:
+            a=5
         """
         all element from the middle+1 index until the end of list will 
         be in the right subtree of the root
         """
         right_subtree = BST.create_BST_from_sorted_arr(arr[(mid + 1):])
-        root_node.right = right_subtree.root
-
+        try:
+            if not right_subtree is None:
+                root_node.right = right_subtree.root
+        except:
+            f=4
         return BST(root_node)
 # -------------------------------------------------------------------------------------------------------------------- #
 # AVL Node class
@@ -659,6 +665,10 @@ print(tree.__repr__()) #calls __repr__ of class BST
 tree.Insert(30,"Hello")
 print(tree.__repr__()) #calls __repr__ of class BST
 # -------------------------------------------------------------------------------------------------------------------- #
+# test3
+arr = [1,2,3,4,5,7,8,9]
+tree = BST.create_BST_from_sorted_arr(arr)
+print(tree.__repr__()) #calls __repr__ of class BST
 # ----------------------------------AVL------------------------------------------------------------------------- #
 # test1 
 tree = AVL()

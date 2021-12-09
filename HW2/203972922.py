@@ -18,26 +18,21 @@ def update_subtree_height(x):
     # set 
     x.height = np.max(x_left_child_height, x_right_child_height) + 1
     return
-def get_left_root_subtree_height(x):
-      root_left_height = x.root.left.height if x.root.left else -1
-      return root_left_height
-  
 def get_left_subtree_height(x):
     left_height = x.left.height if x.left else -1
     return left_height
 def get_right_subtree_height(x):
     right_height = x.right.height if x.right else -1
     return  right_height
-def get_right_root_subtree_height(x):
-    root_right_height = x.root.right.height if x.root.right else -1
-    return  root_right_height
 def get_left_and_right_subtree_heights(x):
-# -------------------------------------------------------------------------------------------------------------------- #
-# Node class
       left_height = get_left_subtree_height(x)
       right_height = get_right_subtree_height(x)
       return left_height, right_height
+# -------------------------------------------------------------------------------------------------------------------- #
+# Node class
 class Node:
+# -------------------------------------------------------------------------------------------------------------------- #
+# BST class
 # -------------------------------------------------------------------------------------------------------------------- #
 # BST class
     """
@@ -271,8 +266,8 @@ class BST:
         secound we needed to dellete this node
 
         return:
-        OK if deleted successfully 
-        NO_ITEM if key not in the BST
+                1. OK if deleted successfully 
+                2. NO_ITEM if key not in the BST
         """
 
         found_node, found_parent = self.find_specific_node_and_its_parent_node_using_key(key)
@@ -410,25 +405,22 @@ class BST:
         of the root
         """
         left_subtree = BST.create_BST_from_sorted_arr(arr[:mid])
-        try:
-            if not left_subtree is None:
-                root_node.left = left_subtree.root
-        except:
-            a=5
+        if not left_subtree is None:
+            root_node.left = left_subtree.root
+
         """
         all element from the middle+1 index until the end of list will 
         be in the right subtree of the root
         """
         right_subtree = BST.create_BST_from_sorted_arr(arr[(mid + 1):])
-        try:
-            if not right_subtree is None:
-                root_node.right = right_subtree.root
-        except:
-            f=4
+        if not right_subtree is None:
+            root_node.right = right_subtree.root
         return BST(root_node)
 # -------------------------------------------------------------------------------------------------------------------- #
 # AVL Node class
 class AVLNode(Node):
+# -------------------------------------------------------------------------------------------------------------------- #
+# AVL Node class
 # -------------------------------------------------------------------------------------------------------------------- #
 # AVL class
     """
@@ -653,8 +645,7 @@ class AVL(BST):
                 return NO_ITEM
         # after deleting the node needed to validate the node is blanced
         self.balance()
-# ----------------------------------BST------------------------------------------------------------------------- #
-    
+# ----------------------------------BST------------------------------------------------------------------------------- #
 # test1
 tree = BST()
 tree.Insert(10,"value for 10")
@@ -663,13 +654,18 @@ print(tree.__repr__()) #calls __repr__ of class BST
 # -------------------------------------------------------------------------------------------------------------------- #
 # test2
 tree.Insert(30,"Hello")
+tree.Insert(30,"50")
+tree.Insert(3,"Or")
 print(tree.__repr__()) #calls __repr__ of class BST
+tree.Insert(9,"Or")
+print(tree.__repr__()) #calls __repr__ of class BST
+
 # -------------------------------------------------------------------------------------------------------------------- #
 # test3
 arr = [1,2,3,4,5,7,8,9]
 tree = BST.create_BST_from_sorted_arr(arr)
 print(tree.__repr__()) #calls __repr__ of class BST
-# ----------------------------------AVL------------------------------------------------------------------------- #
+# ----------------------------------AVL------------------------------------------------------------------------------- #
 # test1 
 tree = AVL()
 tree.Insert(10, "value for 10")
