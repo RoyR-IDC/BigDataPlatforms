@@ -4,25 +4,29 @@ import numpy as np
 # -------------------------------------------------------------------------------------------------------------------- #
 # help functions
 def update_subtree_height(x):
+    x_left_child_height = -1
     if x.left:
         x_left_child_height = x.left.height
-    #
-    else:
-        x_left_child_height = -1
-    #
+    
+    x_right_child_height = -1
     if x.right:
         x_right_child_height = x.right.height
-    #
-    else:
-        x_right_child_height = -1
+
     # set 
-    x.height = np.max(x_left_child_height, x_right_child_height) + 1
+    try:
+        x.height = max([x_left_child_height, x_right_child_height]) + 1
+    except:
+        a=5
     return
 def get_left_subtree_height(x):
-    left_height = x.left.height if x.left else -1
+    left_height = -1 
+    if x.left:
+        left_height = x.left.height
     return left_height
 def get_right_subtree_height(x):
-    right_height = x.right.height if x.right else -1
+    right_height = -1 
+    if x.right:
+        right_height =  x.right.height
     return  right_height
 def get_left_and_right_subtree_heights(x):
       left_height = get_left_subtree_height(x)
@@ -31,8 +35,6 @@ def get_left_and_right_subtree_heights(x):
 # -------------------------------------------------------------------------------------------------------------------- #
 # Node class
 class Node:
-# -------------------------------------------------------------------------------------------------------------------- #
-# BST class
 # -------------------------------------------------------------------------------------------------------------------- #
 # BST class
     """
@@ -76,7 +78,8 @@ class BST:
         return s
     def __repr__(self):
         """
-        :return: a string represent the tree
+        the input is the tree and the output return a string 
+        which represent the tree
         """
         s = '--------------------------------------'
         next = True
@@ -107,8 +110,7 @@ class BST:
         d_arr.reverse()
         for i in range(len(level_arr)):
             s += '\n' + self.__level_repr(level_arr[i], d_arr[i])
-        return s
-    
+        return s  
     def find_min_node_and_his_parent_node(self, node, parent):
         """
         because we working on BST The min value located in the most left node
@@ -178,10 +180,13 @@ class BST:
         node_no_right_child = (node.right is None)
         node_yes_right_child = (not node_no_right_child)
         node_yes_left_child = (not node_no_left_child)
-        parent_yes_left_child =  (parent.left is None)
-        parent_no_right_child = (parent.right is None)
-        parent_yes_left_child = (not parent_yes_left_child)
-        parent_yes_right_child = (not parent_no_right_child)
+        if not parent is None:
+            parent_yes_left_child =  (parent.left is None)
+            parent_no_right_child = (parent.right is None)
+            parent_yes_left_child = (not parent_yes_left_child)
+            parent_yes_right_child = (not parent_no_right_child)
+        
+            
         yes_right_no_left = node_yes_right_child & node_no_left_child
         yes_left_no_right = node_no_right_child & node_yes_left_child
         no_children = node_no_left_child and node_no_right_child
@@ -232,7 +237,7 @@ class BST:
             node.key = right_subtree_min_descendant_node.key
             return OK
         return
-    def Insert(self, key, value):
+    def insert(self, key, value):
         """
         1. Inserts a new node is defined by pair (key,value) .
         2. if key already exists in the BST update the node's value.
@@ -260,7 +265,7 @@ class BST:
     
             self.root = new_node
         return  
-    def Delete(self, key):
+    def delete(self, key):
         """
         first of all needed to find the node we want to delete,
         secound we needed to dellete this node
@@ -374,15 +379,24 @@ class BST:
             arr_traverse += right_subtree.inorder_traversal()
 
         return arr_traverse
+    def find(self, key):
+        """
+        find a nodd using key
+        """
+        cur = self.root
+        while cur is not None:
+            if key > cur.key:
+                cur = cur.right
+            elif key < cur.key:
+                cur = cur.left
+            else:
+                return cur
+        return cur
     @staticmethod
     def create_BST_from_sorted_arr(arr):
-        
-        
         """
         Creates a balanced BST from a sorted list of keys according to the algorithm from class.
-        The values of each key should be None.
-        :param arr: sorted array as Python list
-        :return: an object of type BST representing the balanced BST
+        the input is order list and the output is BST tree
         """
         # check if is empty
         if (arr is None) or (len(arr) == 0):
@@ -416,6 +430,7 @@ class BST:
         if not right_subtree is None:
             root_node.right = right_subtree.root
         return BST(root_node)
+    
 # -------------------------------------------------------------------------------------------------------------------- #
 # AVL Node class
 class AVLNode(Node):
@@ -437,7 +452,6 @@ class AVLNode(Node):
         """
         super(AVLNode, self).__init__(key, value, left, right)
         self.height = 0
-
     def __repr__(self):
         return super(AVLNode, self).__repr__() + ',' + 'height=' + str(self.height)
     def get_balance(self):
@@ -463,9 +477,9 @@ class AVL(BST):
         :param root: root of another AVL
         """
         super(AVL, self).__init__(root)
-        
     def right_rotate(self, node, parent, left_or_right_node_of_parent):
         """
+        rotate right base lacture
         """
 
         # initial x to be the node  
@@ -497,7 +511,7 @@ class AVL(BST):
         update_subtree_height(z)
     def left_rotate(self, node, parent, left_or_right_node_of_parent):
         """
-        
+        rotate left base lacture
         """
         
         # initial x to be the node  
@@ -531,7 +545,9 @@ class AVL(BST):
         return 
     def balance(self):
         """
-        
+        the input is a tree
+        the function blance the tree in the case where the tree is not
+        balanced
         """
         # validate that needed to blance the tree
         if abs(self.root.get_balance()) <= 1:
@@ -557,8 +573,9 @@ class AVL(BST):
             if left_subtree_is_heigher:
                 self.right_rotate(y, self.root, left_subtree_is_heigher)
             self.left_rotate(self.root, None, left_subtree_is_heigher)            
-    def Insert(self, key, value, recursion_level=0):
+    def insert(self, key, value, recursion_level=0):
         """
+        insert a new node to AVL tree
         """
         # check node key is already in the tree
         found_node, found_parent = self.find_specific_node_and_its_parent_node_using_key(key)
@@ -576,7 +593,7 @@ class AVL(BST):
                 # set the left root child as AVL tree
                 left_tree = AVL(self.root.left)
                 # try to insert the node in the left subtree
-                left_tree.Insert(key, value, recursion_level+1)
+                left_tree.insert(key, value, recursion_level+1)
                 # update the left subtree
                 self.root.left = left_tree.root
                 root_right_height = get_left_subtree_height(self.root)
@@ -586,7 +603,7 @@ class AVL(BST):
                 # set the right root child as AVL tree
                 right_tree = AVL(self.root.right)
                 # try to insert the node in the left subtree
-                right_tree.Insert(key, value, recursion_level+1)
+                right_tree.insert(key, value, recursion_level+1)
                 # update the left subtree
                 self.root.right = right_tree.root
                 # get root left subtree heights
@@ -595,19 +612,20 @@ class AVL(BST):
         
         # after deleting the node needed to validate the node is blanced
         self.balance()  
-    def Delete(self, key, recursion_level=0):
-        """
+    def delete(self, key, recursion_level=0):
     
+        """
+        delete a node from AVL tree
         """
         # validate that  tree is not empty
         if self.root is None:
             return NO_ITEM
         found_node_2_delete = (key == self.root.key)
+        """
+        if there is no parent to this root --> delete node
+        """
         if found_node_2_delete:
-            # This will run only if there is no parent to this root (this root is in the original tree)
-            # Otherwise, the following recursion will make sure this if_condition won't be met in the recursion.
-
-            self.delete_node(self.root, None)
+            self.delete_specific_node_using_key(self.root, None)
             return OK
         # find in left subtree
         node_in_left_subtree = key < self.root.key
@@ -616,14 +634,16 @@ class AVL(BST):
             if self.root.left:
                 first_left_node_is_the_node_2_delete = (key == self.root.left.key)
                 if first_left_node_is_the_node_2_delete:
-                    self.delete_node(self.root.left, self.root)
+                    self.delete_specific_node_using_key(self.root.left, self.root)
                 # the node 2 delete in one of children of left subtree
                 else:
                     # set the left root child as AVL tree
                     left_tree = AVL(self.root.left)
-                    # call to delete the node in the subtrees of 
-                    # left child to the new avl tree
-                    left_tree.Delete(key, recursion_level+1)
+                    """
+                    call to delete the node in the subtrees of 
+                    left child to the new avl tree
+                    """
+                    left_tree.delete(key, recursion_level+1)
             # if there is no left root the node is not exists
             else:
                 return NO_ITEM
@@ -632,34 +652,148 @@ class AVL(BST):
             # if there is right subtree
             if self.root.right:
                 if key == self.root.right.key:
-                    self.delete_node(self.root.right, self.root)
+                    self.delete_specific_node_using_key(self.root.right, self.root)
                 else:
                     # set the left root child as AVL tree
                     right_tree = AVL(self.root.right)
-                    # call to delete the node in the subtrees of 
-                    # right child to the new avl tree
-                    right_tree.Delete(key, recursion_level+1)
+                    """
+                    call to delete the node in the subtrees of 
+                    right child to the new avl tree
+                    """
+                    right_tree.delete(key, recursion_level+1)
                     
             # if there is no right root the node is not exists
             else:
                 return NO_ITEM
         # after deleting the node needed to validate the node is blanced
         self.balance()
+    def find(self, key):
+        """
+        find a nodd using key
+        """
+        cur = self.root
+        while cur is not None:
+            if key > cur.key:
+                cur = cur.right
+            elif key < cur.key:
+                cur = cur.left
+            else:
+                return cur
+        return cur
+    def delete_specific_node_using_key(self, node, parent):
+        """
+        there are 4 options:
+            1. node not exists
+                a) return no item
+            2. node not have any children
+                a) check if node is root
+                b) delete the node if he is left/right child of parent
+                c) update parent height relatie left/right subtree height
+                   
+            3. node have right subtree
+                If node has only one right child then it's child will replace
+                this node by becoming the child of the parent of this node.
+                a) if node key greater than parent key
+                   -> right subtree is right subtree of parent
+                b) else -> left subtree is right subtree of parent
+    
+            4.  node have left subtree
+                a) if node key greater than parent key
+                   -> left subtree is right subtree of parent
+                b) else -> left subtree is left subtree of parent
+                    
+            5. have left and right subtree
+                *) If node has two children then replace it's value with the 
+                   minimum key in the right sub-tree.
+                *) then we can delete the node in the the right sub-tree.
+                Notes:
+        """
+        # we can't delete the node because the node dosnot exist.
+        node_not_exists = (node is None)
+        if node_not_exists:
+            return NO_ITEM
+        # create all condition combinations
+        node_no_left_child =  (node.left is None)
+        node_no_right_child = (node.right is None)
+        node_yes_right_child = (not node_no_right_child)
+        node_yes_left_child = (not node_no_left_child)
+        if not parent is None:
+            parent_yes_left_child =  (parent.left is None)
+            parent_no_right_child = (parent.right is None)
+            parent_yes_left_child = (not parent_yes_left_child)
+            parent_yes_right_child = (not parent_no_right_child)
+        
+            
+        yes_right_no_left = node_yes_right_child & node_no_left_child
+        yes_left_no_right = node_no_right_child & node_yes_left_child
+        no_children = node_no_left_child and node_no_right_child
+        if no_children:
+            is_root = (parent is None)
+            if is_root:   # the node is the root and we will delete him
+                self.root = None
+            else:
+                node_is_right_child_of_parent = (parent.key < node.key)
+                if node_is_right_child_of_parent:
+                    parent.right = None # delete the node
+                    if parent_yes_left_child: # neede to update height relative to child height
+                        parent_left_height = parent.left.height
+                    else: # parent becoming the root
+                        parent_left_height = -1 
+                    parent.height = parent_left_height + 1
+                else: # node_is_left_child_of_parent
+                    parent.left = None  # delete left child
+                    if parent_yes_right_child: # neede to update height relative to child height
+                        parent_right_height = parent.right.height
+                    else: # parent becoming the root
+                        parent_right_height = -1 
+                    parent.height = parent_right_height + 1
+            return OK
+        elif yes_left_no_right:
+            parent_key_is_smaller_than_node = (parent.key < node.key)
+            if parent_key_is_smaller_than_node:
+                parent.right = node.left
+            else:
+                parent.left = node.left
+            return OK
+        elif yes_right_no_left:
+        
+            parent_key_is_smaller_than_node = (parent.key < node.key)
+            if parent_key_is_smaller_than_node:
+                parent.right = node.right
+            else:
+                parent.left = node.right
+            return OK
+        else :
+            
+            right_subtree_min_descendant_node, parent_of_min_node = \
+                            self.find_min_node_and_his_parent_node(node.right, node)
+            # Delete the descendant using a simple only one level of recursion.
+            # Because the descendant node C can't have left child.
+            self.delete_specific_node_using_key(right_subtree_min_descendant_node, parent_of_min_node)
+            # update key
+            node.key = right_subtree_min_descendant_node.key
+            return OK
+        return
 # ----------------------------------BST------------------------------------------------------------------------------- #
+
+#### #### #### tests #### #### ####
+"""
+tests
 # test1
+
 tree = BST()
-tree.Insert(10,"value for 10")
-tree.Insert(20,"Hi")
+print(tree.__repr__()) #calls __repr__ of class BST
+tree.insert(10,"value for 10")
+tree.insert(20,"Hi")
 print(tree.__repr__()) #calls __repr__ of class BST
 # -------------------------------------------------------------------------------------------------------------------- #
 # test2
-tree.Insert(30,"Hello")
-tree.Insert(30,"50")
-tree.Insert(3,"Or")
+tree.insert(30,"Hello")
+tree.insert(30,"50")
+tree.insert(3,"Or")
 print(tree.__repr__()) #calls __repr__ of class BST
-tree.Insert(9,"Or")
+tree.insert(9,"Or")
 print(tree.__repr__()) #calls __repr__ of class BST
-
 # -------------------------------------------------------------------------------------------------------------------- #
 # test3
 arr = [1,2,3,4,5,7,8,9]
@@ -668,11 +802,169 @@ print(tree.__repr__()) #calls __repr__ of class BST
 # ----------------------------------AVL------------------------------------------------------------------------------- #
 # test1 
 tree = AVL()
-tree.Insert(10, "value for 10")
-tree.Insert(20, "Hi")
+tree.insert(10, "value for 10")
+tree.insert(20, "Hi")
 print(tree)
 # -------------------------------------------------------------------------------------------------------------------- #
 # test2 
-tree.Insert(30, "Hello")
+tree.insert(30, "Hello")
 print(tree)
 # -------------------------------------------------------------------------------------------------------------------- #
+
+
+keys = [20, 14, 30, -10, 17, 25, 45, 11, 35, 200, 41, 40]
+values = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l']
+elements = list(zip(keys,values))
+
+my_bst = BST()
+print('*********************************************')
+to_delete = 14
+print(f'Delete node ({to_delete}) that doesnt exit')
+res = my_bst.delete(to_delete)
+print('original Tree')
+print(my_bst)
+print(f"result for deleting {to_delete} is {res}")
+print('Tree after deleting')
+print(my_bst)
+
+# fix
+print('*********************************************')
+to_insert = elements[0]
+print(f'Insert node ({to_delete}) node which is the root')
+res = my_bst.insert(to_insert[0], to_insert[1])
+print(f"result for inserting {to_insert} is {res}")
+print('Tree after inserting')
+print(my_bst)
+to_delete = 20
+print(f'Delete node ({to_delete}) that is the only one')
+res = my_bst.delete(to_delete)
+print('original Tree')
+print(my_bst)
+print(f"result for deleting {to_delete} is {res}")
+print('Tree after deleting')
+print(my_bst)
+
+
+print('*********************************************')
+print('Build Tree from these elements:')
+print (elements)
+my_bst = BST()
+for e in elements:
+    my_bst.insert(e[0],e[1])
+print('original Tree')
+print(my_bst)
+
+
+print('*********************************************')
+sorted = my_bst.inorder_traversal()
+print(f'Build BST from sorted arr {sorted}')
+cur_bst = BST.create_BST_from_sorted_arr(sorted)
+print(cur_bst)
+### fix
+print('*********************************************')
+print(f'Build AVL from sorted same sorted array above and compare answers')
+keys = sorted
+values = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l']
+elements = list(zip(keys,values))
+my_avl = AVL()
+for e in elements:
+    my_avl.insert(e[0],e[1])
+    print(my_avl)
+print('*********************************************')
+
+
+
+
+# fix
+keys = [70, 60, 85, 50, 63, 77, 90, 65, 80, 88, 100, 110]
+values = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l']
+elements = list(zip(keys,values))
+print('*********************************************')
+print('Elements inserted to key by order:')
+print (elements)
+print('*********************************************')
+my_avl = AVL()
+for e in elements:
+    my_avl.insert(e[0],e[1])
+
+print('original Tree')
+print(my_avl)
+print('original heights:')
+heights = [my_avl.find(e).height for e in my_avl.preorder_traversal()]
+elements_heights = list(zip(keys,values,heights))
+print(elements_heights)
+
+# fix 
+to_delete = 60
+print('*********************************************')
+print(f'Delete node ({to_delete}) with two children')
+res = my_avl.delete(to_delete)
+print('Tree after deleting:')
+print(my_avl)
+print(f'delete result is: {res}')
+print('New heights:')
+my_avl_list = my_avl.preorder_traversal()
+keys = [my_avl.find(e).key for e in my_avl_list]
+values = [my_avl.find(e).value for e in my_avl_list]
+heights = [my_avl.find(e).height for e in my_avl_list]
+elements_heights = list(zip(keys,values,heights))
+print(elements_heights)
+print('*********************************************')
+
+to_delete = 88
+print(f'Delete node ({to_delete}) with no children')
+res = my_avl.delete(to_delete)
+print('Tree after deleting:')
+print(my_avl)
+print(f'delete result is: {res}')
+print('New heights:')
+my_avl_list = my_avl.preorder_traversal()
+keys = [my_avl.find(e).key for e in my_avl_list]
+values = [my_avl.find(e).value for e in my_avl_list]
+heights = [my_avl.find(e).height for e in my_avl_list]
+elements_heights = list(zip(keys,values,heights))
+print(elements_heights)
+print('*********************************************')
+to_delete = 77
+print(f'Delete node ({to_delete}) with one child')
+res = my_avl.delete(to_delete)
+print('Tree after deleting:')
+print(my_avl)
+print(f'delete result is: {res}')
+print('New heights:')
+my_avl_list = my_avl.preorder_traversal()
+keys = [my_avl.find(e).key for e in my_avl_list]
+values = [my_avl.find(e).value for e in my_avl_list]
+heights = [my_avl.find(e).height for e in my_avl_list]
+elements_heights = list(zip(keys,values,heights))
+print(elements_heights)
+print('*********************************************')
+to_insert = (64,'m')
+print(f'Insert node ({to_insert[0],to_insert[1]}) that has left-right rotation path')
+res = my_avl.insert(to_insert[0],to_insert[1])
+print('Tree after inserting:')
+print(my_avl)
+print(f'insert result is: {res}')
+print('New heights:')
+my_avl_list = my_avl.preorder_traversal()
+keys = [my_avl.find(e).key for e in my_avl_list]
+values = [my_avl.find(e).value for e in my_avl_list]
+heights = [my_avl.find(e).height for e in my_avl_list]
+elements_heights = list(zip(keys,values,heights))
+print(elements_heights)
+print('*********************************************')
+to_insert = (64,'jjjj')
+print(f'Insert node ({to_insert[0],to_insert[1]}) that exist in the tree ')
+res = my_avl.insert(to_insert[0],to_insert[1])
+print('Tree after inserting:')
+print(my_avl)
+print(f'insert result is: {res}')
+print('New heights:')
+my_avl_list = my_avl.preorder_traversal()
+keys = [my_avl.find(e).key for e in my_avl_list]
+values = [my_avl.find(e).value for e in my_avl_list]
+heights = [my_avl.find(e).height for e in my_avl_list]
+elements_heights = list(zip(keys,values,heights))
+print(elements_heights)
+print('*********************************************')
+"""
