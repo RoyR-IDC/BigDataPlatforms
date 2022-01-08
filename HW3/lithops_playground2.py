@@ -45,11 +45,8 @@ def init_configurations():
 def inverted_map(document_name: str):
     try:
         # Preparations
-        curr_config = global_config
-        bucket_name, csv_name = document_name.split(sep='///')
-        curr_config['ibm_cos']['storage_bucket'] = bucket_name
         storage = Storage(config=global_config)
-        data = storage.get_object(bucket_name, csv_name)
+        data = storage.get_object(global_config['ibm_cos']['storage_bucket'], document_name)
 
         # Begin
         csv_df = pd.read_csv(BytesIO(data), encoding='utf8', sep=",", index_col=0)
@@ -58,7 +55,7 @@ def inverted_map(document_name: str):
         output_list = []
         for i_col in csv_columns:
             col_vals = csv_df[i_col].to_list()
-            curr_ouput = list(map(lambda x, y, z: (x + '_' + y, z), csv_size * [i_col], col_vals, csv_size * [csv_name]))
+            curr_ouput = list(map(lambda x, y, z: (x + '_' + y, z), csv_size * [i_col], col_vals, csv_size * [document_name]))
             output_list += curr_ouput
 
     except Exception as exception:
@@ -115,8 +112,7 @@ class MapReduceServerlessEngine(object):
         # call function async-ly
         response_list = []
         for csv_name in list_of_csv_names:
-            document_name = bucket_name + '///' + csv_name
-            response = self._fexec.call_async(func=map_function, data={'document_name': document_name})
+            response = self._fexec.call_async(func=map_function, data={'document_name': csv_name})
             response_list.append(response)
 
         try:
@@ -169,7 +165,6 @@ class MapReduceServerlessEngine(object):
         response_list = []
         for item in generated_list:
             response = self._fexec.call_async(func=reduce_function, data={'data': item})
-            # response = reduce_function(item)
             response_list.append(response)
 
         try:
@@ -229,7 +224,12 @@ class MapReduceServerlessEngine(object):
 if __name__ == '__main__':
     # Prepare
     init_configurations()
-    input_data = 'cos://eu-de/cloud-object-storage-mq-cos-standard-8s4/'
+
+    # input_data = 'cos://eu-de/cloud-object-storage-mq-cos-standard-8s4/'
+    separator = '/'
+    ibm_intro = 'cos://'
+    extra_path = ''
+    input_data = ibm_intro + global_config['ibm_cos']['region'] + separator + global_config['ibm_cos']['storage_bucket'] + separator
     print(f'input_data:\n{input_data}')
 
     # Run
