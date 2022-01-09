@@ -9,7 +9,27 @@ import pandas as pd
 from lithops import Storage
 
 
-global_config = ...
+global_config = {
+                    'lithops': 
+                        {
+                        'backend': 'ibm_cf',
+                        'storage': 'ibm_cos',
+                        'log_level': 'DEBUG'
+                        },
+                    'ibm_cf': 
+                        {
+                        'endpoint': 'https://us-south.functions.cloud.ibm.com',
+                        'namespace': 'roy.rubin@post.idc.ac.il_dev',
+                        'api_key': '1defbac0-eea1-4bb8-b5d4-cee7e63b3bb4:63a0ls32DAGjVe0TkdUcBqcOL7lOtR7bLsQYf98WGgW2xpp9Bpd0BUSubnlsfNQM',
+                        },
+                    'ibm_cos': 
+                        {
+                        'storage_bucket': 'cloud-object-storage-mq-cos-standard-8s4',
+                        'region': 'eu-de',
+                        "access_key": "bb21b4d35ef046d19b4f6fd93f39a3a5",
+                        "secret_key": "d9db9b67564ec2fc5467820ef8719533cdc2e64a5ce33695",
+                        }
+                }
 
 
 def init_configurations():
@@ -76,6 +96,12 @@ def inverted_reduce(data):
         return [], False
 
     return return_list, True
+def write_list_to_txt_file(path, List):
+    with open(path, 'w') as f:
+        for item in List:
+            f.write("%s\n" % item)
+    f.close()
+    return
 
 
 class MapReduceServerlessEngine(object):
@@ -122,6 +148,9 @@ class MapReduceServerlessEngine(object):
             status = 'Map Reduce Failed'
             return status
 
+        # get all map logs
+        map_loglist = list(map(lambda x: x.logs, response_list))
+        
         # get list of succeed or failed of threads
         boolean_results = [boolean for output, boolean in results]
 
@@ -176,6 +205,9 @@ class MapReduceServerlessEngine(object):
 
         # 9) Once all threads completed, print on the screen
         #   `MapReduce Completed` otherwise print `MapReduce Failed`
+        
+        # get all reduce logs
+        reduce_loglist = list(map(lambda x: x.logs, response_list))
 
         # get list of succeed or failed of threads
         boolean_results = [boolean for output, boolean in results]
@@ -184,8 +216,9 @@ class MapReduceServerlessEngine(object):
         if False in boolean_results:
             status = 'Map Reduce Failed'
             return status
-
-        #
+        log_seprator = '----------------------------------'
+        map_and_reduce_logs = [log_seprator+ 'Map log' + log_seprator] + map_loglist + reduce_loglist + [log_seprator+'Reduce log' +log_seprator]
+        write_list_to_txt_file('map_reduce_log_file.txt',map_and_reduce_logs )
         outputs = [output for output, boolean in results]
         reduce_df = pd.DataFrame(data=outputs)
         return reduce_df
