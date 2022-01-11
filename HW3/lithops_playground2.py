@@ -45,8 +45,6 @@ def init_configurations():
     amount_of_process = 2
     csv_columns = ['firstname', 'secondname', 'city']
     db_columns = ['key', 'value']
-    map_reduce_folder_names = [os.path.join(Current_python_file_path, 'mapreducetemp'),
-                               os.path.join(Current_python_file_path, 'mapreducefinal')]
 
     db_columns_type = ['text', 'text']
 
@@ -96,6 +94,8 @@ def inverted_reduce(data):
         return [], False
 
     return return_list, True
+
+
 def write_list_to_txt_file(path, List):
     with open(path, 'w') as f:
         for item in List:
@@ -108,6 +108,9 @@ class MapReduceServerlessEngine(object):
     def __init__(self):
         # create a function executor
         self._fexec = lithops.FunctionExecutor(config=global_config)
+        self._bucket_name = global_config['ibm_cos']['storage_bucket']
+        self._region_name = global_config['ibm_cos']['region']
+        self._create_database()
 
     def execute(self, input_data, map_function, reduce_function):
         """
@@ -125,13 +128,11 @@ class MapReduceServerlessEngine(object):
         #     is a unique number per each thread.
         #  3) Keep the list of all threads and check whether they are completed
 
-        region, bucket_name, extra = self._parse_input_data(input_data)
-        self._bucket_name = global_config['ibm_cos']['storage_bucket']
+        # Create cloud storage object
+        self._storage = Storage(config=global_config)
+        _, _, path_to_csv = self._parse_input_data(input_data)
 
-        curr_config = global_config
-        self._storage = Storage(config=curr_config)
-
-        list_of_objects = self._storage.list_objects(bucket=bucket_name)
+        list_of_objects = self._storage.list_objects(bucket=self._bucket_name, prefix=path_to_csv)
         list_of_csv_objects = [item for item in list_of_objects if '.csv' in item['Key']]
         list_of_csv_names = [item['Key'] for item in list_of_csv_objects if '.csv' in item['Key']]
 
@@ -181,7 +182,7 @@ class MapReduceServerlessEngine(object):
         # query data base using GROUP_CONCAT and GROUP BY  and ORDER BY
         generated_list = self._get_grouped_info_from_db_by_key(key='key')
 
-        # 6) **Start a new thread** for each value from
+        # 6) **Start a new serverless execution** for each value from
         #    the generated list in the previous step, to execute `reduce_function(key,value)
         #    Begin by Performing REDUCE actions
         #    we will open a thread for each REDUCE
@@ -216,9 +217,13 @@ class MapReduceServerlessEngine(object):
         if False in boolean_results:
             status = 'Map Reduce Failed'
             return status
+
+        # write all serverless execution logs (for each "response" object) to file
         log_seprator = '----------------------------------'
         map_and_reduce_logs = [log_seprator+ 'Map log' + log_seprator] + map_loglist + reduce_loglist + [log_seprator+'Reduce log' +log_seprator]
-        write_list_to_txt_file('map_reduce_log_file.txt',map_and_reduce_logs )
+        write_list_to_txt_file('future_responses_logs_file.txt', map_and_reduce_logs)
+
+        # return map+reduce output as pandas dataframe for user
         outputs = [output for output, boolean in results]
         reduce_df = pd.DataFrame(data=outputs)
         return reduce_df
@@ -245,13 +250,40 @@ class MapReduceServerlessEngine(object):
         if input_data is None or input_data == '':
             raise AssertionError(f'Bad arguments passed: input_data is None or input_data == ''')
 
-        parts = input_data.split(sep='cos://')[1].split(sep='/')
+        sep = '/'
+        parts = input_data.split(sep='cos://')[1].split(sep=sep)
 
         region = parts[0]
         bucket = parts[1]
-        extra = parts[2:]
+        path_to_csv = sep + sep.join(parts[2:])
 
-        return region, bucket, extra
+        if self._bucket_name != bucket:
+            raise AssertionError(f'bucket name in input data does not match the one given in global config')
+        if self._region_name != region:
+            raise AssertionError(f'region name in input data does not match the one given in global config')
+
+        return region, bucket, path_to_csv
+
+    def _create_database(self):
+        is_exist = os.path.exists(db_file_name)
+        if is_exist:
+            os.remove(db_file_name)
+        con = sqlite3.connect(db_file_name)
+
+        cur = con.cursor()
+
+        # Create table
+        columns_type_list = list(map(lambda x, y: x + ' ' + y, db_columns, db_columns_type))
+        columns_type_list_string = "(" + ", ".join(map(str, columns_type_list)) + ")"
+
+        cur.execute(''' 
+                    CREATE TABLE temp_results
+                    ''' + columns_type_list_string + \
+                    '''''')
+
+        con.commit()
+        con.close()
+        return
 
 
 if __name__ == '__main__':
@@ -261,11 +293,15 @@ if __name__ == '__main__':
     # input_data = 'cos://eu-de/cloud-object-storage-mq-cos-standard-8s4/'
     separator = '/'
     ibm_intro = 'cos://'
-    extra_path = ''
-    input_data = ibm_intro + global_config['ibm_cos']['region'] + separator + global_config['ibm_cos']['storage_bucket'] + separator
+    path_to_csv = 'HW3Data/CSVData/'
+    input_data = ibm_intro + global_config['ibm_cos']['region'] + separator + global_config['ibm_cos']['storage_bucket'] + separator + path_to_csv
     print(f'input_data:\n{input_data}')
 
     # Run
     mapreduce = MapReduceServerlessEngine()
     result = mapreduce.execute(input_data, inverted_map, inverted_reduce)
     print(result)
+
+    # Clean
+    if os.path.exists(db_file_name):
+        os.remove(db_file_name)
