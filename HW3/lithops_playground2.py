@@ -14,7 +14,7 @@ global_config = {
                         {
                         'backend': 'ibm_cf',
                         'storage': 'ibm_cos',
-                        'log_level': 'DEBUG'
+                        # 'log_level': 'DEBUG'
                         },
                     'ibm_cf': 
                         {
